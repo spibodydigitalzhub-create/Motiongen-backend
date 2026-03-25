@@ -8,17 +8,24 @@ app.use(express.json());
 
 const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
 
+// put your exact model version here
+const LTX_VIDEO_VERSION =
+  process.env.LTX_VIDEO_VERSION ||
+  "PASTE_LTX_VIDEO_VERSION_HERE";
+
 app.get("/", (req, res) => {
   res.json({
     message: "Backend working 🚀",
-    hasToken: !!REPLICATE_API_TOKEN
+    hasToken: !!REPLICATE_API_TOKEN,
+    hasVersion: LTX_VIDEO_VERSION !== "PASTE_LTX_VIDEO_VERSION_HERE"
   });
 });
 
 app.get("/debug-token", (req, res) => {
   res.json({
     hasToken: !!REPLICATE_API_TOKEN,
-    tokenPrefix: REPLICATE_API_TOKEN ? REPLICATE_API_TOKEN.slice(0, 3) : null
+    tokenPrefix: REPLICATE_API_TOKEN ? REPLICATE_API_TOKEN.slice(0, 3) : null,
+    hasVersion: LTX_VIDEO_VERSION !== "PASTE_LTX_VIDEO_VERSION_HERE"
   });
 });
 
@@ -36,29 +43,39 @@ app.post("/generate-video", async (req, res) => {
       return res.status(400).json({ error: "Prompt is required" });
     }
 
-    const response = await fetch(
-      "https://api.replicate.com/v1/models/lightricks/ltx-video/predictions",
-      {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${REPLICATE_API_TOKEN}`,
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({
-          input: {
-            prompt,
-            negative_prompt: "low quality, worst quality",
-            aspect_ratio: "16:9",
-            length: durationToFrames(duration)
-          }
-        })
-      }
-    );
+    if (!REPLICATE_API_TOKEN) {
+      return res.status(500).json({ error: "REPLICATE_API_TOKEN is missing on server" });
+    }
+
+    if (LTX_VIDEO_VERSION === "PASTE_LTX_VIDEO_VERSION_HERE") {
+      return res.status(500).json({ error: "LTX video model version is missing" });
+    }
+
+    const response = await fetch("https://api.replicate.com/v1/predictions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${REPLICATE_API_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        version: LTX_VIDEO_VERSION,
+        input: {
+          prompt,
+          negative_prompt: "low quality, worst quality",
+          aspect_ratio: "16:9",
+          length: durationToFrames(duration)
+        }
+      })
+    });
 
     const data = await response.json();
 
     if (!response.ok) {
-      return res.status(response.status).json(data);
+      console.error("Replicate create error:", data);
+      return res.status(response.status).json({
+        error: data.detail || data.title || data.error || "Backend request failed",
+        raw: data
+      });
     }
 
     res.json({
@@ -67,33 +84,39 @@ app.post("/generate-video", async (req, res) => {
       status: data.status || "starting"
     });
   } catch (error) {
+    console.error("Generate error:", error);
     res.status(500).json({
-      error: error.message
+      error: error.message || "Failed to start generation"
     });
   }
 });
 
 app.get("/video-status/:id", async (req, res) => {
   try {
-    const response = await fetch(
-      `https://api.replicate.com/v1/predictions/${req.params.id}`,
-      {
-        headers: {
-          "Authorization": `Bearer ${REPLICATE_API_TOKEN}`,
-          "Content-Type": "application/json"
-        }
+    if (!REPLICATE_API_TOKEN) {
+      return res.status(500).json({ error: "REPLICATE_API_TOKEN is missing on server" });
+    }
+
+    const response = await fetch(`https://api.replicate.com/v1/predictions/${req.params.id}`, {
+      headers: {
+        "Authorization": `Bearer ${REPLICATE_API_TOKEN}`,
+        "Content-Type": "application/json"
       }
-    );
+    });
 
     const data = await response.json();
 
     if (!response.ok) {
-      return res.status(response.status).json(data);
+      console.error("Replicate status error:", data);
+      return res.status(response.status).json({
+        error: data.detail || data.title || data.error || "Status check failed",
+        raw: data
+      });
     }
 
     let videoUrl = null;
 
-    if (data.status === "succeeded" && data.output) {
+    if ((data.status === "succeeded" || data.status === "successful") && data.output) {
       if (Array.isArray(data.output)) {
         videoUrl = data.output[0];
       } else {
@@ -108,8 +131,9 @@ app.get("/video-status/:id", async (req, res) => {
       error: data.error || null
     });
   } catch (error) {
+    console.error("Status error:", error);
     res.status(500).json({
-      error: error.message
+      error: error.message || "Failed to fetch video status"
     });
   }
 });
