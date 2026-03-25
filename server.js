@@ -8,24 +8,17 @@ app.use(express.json());
 
 const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
 
-// put your exact model version here
-const LTX_VIDEO_VERSION =
-  process.env.LTX_VIDEO_VERSION ||
-  "PASTE_LTX_VIDEO_VERSION_HERE";
-
 app.get("/", (req, res) => {
   res.json({
     message: "Backend working 🚀",
-    hasToken: !!REPLICATE_API_TOKEN,
-    hasVersion: LTX_VIDEO_VERSION !== "PASTE_LTX_VIDEO_VERSION_HERE"
+    hasToken: !!REPLICATE_API_TOKEN
   });
 });
 
 app.get("/debug-token", (req, res) => {
   res.json({
     hasToken: !!REPLICATE_API_TOKEN,
-    tokenPrefix: REPLICATE_API_TOKEN ? REPLICATE_API_TOKEN.slice(0, 3) : null,
-    hasVersion: LTX_VIDEO_VERSION !== "PASTE_LTX_VIDEO_VERSION_HERE"
+    tokenPrefix: REPLICATE_API_TOKEN ? REPLICATE_API_TOKEN.slice(0, 3) : null
   });
 });
 
@@ -47,10 +40,6 @@ app.post("/generate-video", async (req, res) => {
       return res.status(500).json({ error: "REPLICATE_API_TOKEN is missing on server" });
     }
 
-    if (LTX_VIDEO_VERSION === "PASTE_LTX_VIDEO_VERSION_HERE") {
-      return res.status(500).json({ error: "LTX video model version is missing" });
-    }
-
     const response = await fetch("https://api.replicate.com/v1/predictions", {
       method: "POST",
       headers: {
@@ -58,7 +47,7 @@ app.post("/generate-video", async (req, res) => {
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
-        version: LTX_VIDEO_VERSION,
+        model: "lightricks/ltx-video",
         input: {
           prompt,
           negative_prompt: "low quality, worst quality",
