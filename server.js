@@ -32,7 +32,7 @@ app.post("/generate-video", async (req, res) => {
       model: "lightricks/ltx-video",
       input: {
         prompt,
-        negative_prompt: "low quality, worst quality, deformed, distorted",
+        negative_prompt: "low quality, worst quality",
         aspect_ratio: "16:9",
         length: durationToFrames(duration)
       }
@@ -45,7 +45,7 @@ app.post("/generate-video", async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      error: error.message || "Failed to start generation"
+      error: error.message
     });
   }
 });
@@ -57,9 +57,9 @@ app.get("/video-status/:id", async (req, res) => {
     let videoUrl = null;
 
     if (prediction.status === "succeeded" && prediction.output) {
-      if (Array.isArray(prediction.output) && prediction.output.length > 0) {
+      if (Array.isArray(prediction.output)) {
         videoUrl = prediction.output[0];
-      } else if (typeof prediction.output === "string") {
+      } else {
         videoUrl = prediction.output;
       }
     }
@@ -72,7 +72,7 @@ app.get("/video-status/:id", async (req, res) => {
     });
   } catch (error) {
     res.status(500).json({
-      error: error.message || "Failed to fetch video status"
+      error: error.message
     });
   }
 });
