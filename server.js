@@ -7,6 +7,7 @@ app.use(cors());
 app.use(express.json());
 
 const REPLICATE_API_TOKEN = process.env.REPLICATE_API_TOKEN;
+const LTX_VIDEO_VERSION = "8c47da666861d081eeb4d1261853087de23923a268a69b63febdf5dc1dee08e4";
 
 app.get("/", (req, res) => {
   res.json({
@@ -39,22 +40,23 @@ app.post("/generate-video", async (req, res) => {
     if (!REPLICATE_API_TOKEN) {
       return res.status(500).json({ error: "REPLICATE_API_TOKEN is missing on server" });
     }
-const response = await fetch("https://api.replicate.com/v1/predictions", {
-  method: "POST",
-  headers: {
-    "Authorization": `Bearer ${REPLICATE_API_TOKEN}`,
-    "Content-Type": "application/json"
-  },
-  body: JSON.stringify({
-    version: "3c60b6b8e6d2c1f4c5a4fbb1c8a8b6f9d9e2a6e6c5d4b3a2f1e0d9c8b7a6f5e4", // ✅ REQUIRED
-    input: {
-      prompt,
-      negative_prompt: "low quality, worst quality",
-      aspect_ratio: "16:9",
-      length: durationToFrames(duration)
-    }
-  })
-});
+
+    const response = await fetch("https://api.replicate.com/v1/predictions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${REPLICATE_API_TOKEN}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        version: LTX_VIDEO_VERSION,
+        input: {
+          prompt,
+          negative_prompt: "low quality, worst quality",
+          aspect_ratio: "16:9",
+          length: durationToFrames(duration)
+        }
+      })
+    });
 
     const data = await response.json();
 
